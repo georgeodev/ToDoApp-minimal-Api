@@ -1,9 +1,11 @@
 ﻿using System;
+using Microsoft.EntityFrameworkCore;
 namespace MyTodoApp
 {
-	public class ToDoDbContext
+	public class ToDoDbContext : DbContext
 	{
-		public ToDoDbContext()
+		public DbSet<TodoItem> ToDoItems => Set<TodoItem>();
+		public ToDoDbContext(DbContextOptions<ToDoDbContext> options) : base(options)
 		{
 		}
 	}

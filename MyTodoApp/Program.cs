@@ -1,45 +1,65 @@
-﻿var builder = WebApplication.CreateBuilder(args);
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.EntityFrameworkCore;
+using MyTodoApp;
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(); //for API documentation
+//setting up the database to use inmemory database gotten from the entity framework core
+builder.Services.AddDbContext<ToDoDbContext>(opt => opt.UseInMemoryDatabase("TodoApp"));
 
-var app = builder.Build();
+var app = builder.Build(); //this line of code is what builds the app
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
+//creating endpoint for Get
+app.MapGet("/todolist", async (ToDoDbContext db) =>
+await db.ToDoItems.ToListAsync());
+
+app.MapGet("/todolist/{id}", async (int id, ToDoDbContext db) =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    var toDoItem = await db.ToDoItems.FindAsync(id);
+    return toDoItem != null ? Results.Ok(toDoItem) : Results.NotFound();
+ 
+});
+//creating endpoint for Post
+app.MapPost("/todolist", async (TodoItem toDoItem, ToDoDbContext db) =>
+{
+    db.ToDoItems.Add(toDoItem);
+    await db.SaveChangesAsync();
+    return Results.Created($"/ShoppingList/{toDoItem.Id}", toDoItem);
+
+});
+//creating endpoint for Put
+app.MapPut("/todolist/{id}", async (int id, TodoItem toDoItem, ToDoDbContext db) =>
+{
+    var toDoItemToBeUpdated = await db.ToDoItems.FindAsync(id);
+    if (toDoItemToBeUpdated != null)
+    {
+        
+        //we can do this to update individual properties
+        toDoItemToBeUpdated.TaskName = toDoItem.TaskName;
+        toDoItemToBeUpdated.Comment = toDoItemToBeUpdated.Comment;
+        toDoItemToBeUpdated.IsComplete = toDoItem.IsComplete;
+        await db.SaveChangesAsync();
+        return Results.Ok(toDoItemToBeUpdated);
+    }
+
+    return Results.NotFound();
+});
+
+//creating endpoint for Delete
+app.MapDelete("/todolist/{id}", async (int id, ToDoDbContext db) =>
+{
+    var toDoItem = await db.ToDoItems.FindAsync(id);
+    if (toDoItem != null)
+    {
+        db.ToDoItems.Remove(toDoItem);
+        await db.SaveChangesAsync();
+        return Results.NoContent();
+    }
+
+    return Results.NotFound();
+});
+
 
 app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
-
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
-
